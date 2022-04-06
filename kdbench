@@ -1,0 +1,215 @@
+#!/usr/bin/env bash
+
+# kdbench(1) is a utility to test storageclass performance easily 
+
+# Copyright 2022 SysNet4Admin (Hoon Jo)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[[ -n $DEBUG ]] && set -x
+set -eou pipefail
+IFS=$'\n\t'
+
+SELF_CMD="$0"
+SCRACHFILE=~/.kdbench/kdbench.scra
+YAMLFILE=~/.kdbench/kdbench.yaml
+
+exit_err() {
+   exit 1
+}
+
+delete_pvc_after_job_done() {
+  echo -n "Waiting for job finished by ttlSecondsAfterFinished..."
+  while true; do 
+    if [[ "$(kubectl get job -l fio=kdbench 2>&1)" = *"No resources"* ]]; then
+      echo -e "\nkdbench finsihed and pvc will delete"
+      kubectl delete pvc -l fio=kdbench 
+      exit 0
+    else
+      # print dot for waiting status 
+      echo -n ".";sleep 1
+    fi 
+  done 
+}
+
+run_kdbench(){
+    # deploy kdbench 
+    kubectl apply -f "$YAMLFILE"
+    # wait message for dbench 
+    echo -n "Waiting for kdbench's load (up to 5mins)..."
+    local count=0
+    while true; do
+      PODSTATUS=$(kubectl get po -l job-name=kdbench 2>&1)
+      if [[ "$PODSTATUS" = *"Creating"* ]] || [[ "$PODSTATUS" = *"Pending"* ]]; then
+        echo -n ".";sleep 1; ((count=count+1))
+        if [[ $count -gt 300 ]]; then 
+          echo -e "\n\n********* Error: Events as below *********"
+          $KUBECTL describe pvc kdbench-pv-claim | grep Message -A 50
+          exit_err
+        fi 
+      elif [[ "$PODSTATUS" = *"Running"* ]]; then
+        break 
+      else
+        echo "Pod is abnormal status"
+      fi 
+    done 
+    # kdbench result print out on stdout 
+    kubectl logs -f job/kdbench
+}
+
+get_storageclasses() {
+  $KUBECTL get storageclasses -o=name | cut -c 29-
+}
+
+set_storageclass() {
+  sed -i'' -e "s|your-storageclass|${1}|g" "$YAMLFILE"
+}
+
+choose_n_run_storageclasses_interactive() {
+  local choice
+  choice="$(FZF_DEFAULT_COMMAND="${SELF_CMD}" \
+    fzf --ansi --no-preview || true)"
+  if [[ -z "${choice}" ]]; then
+    echo 2>&1 "error: you did not choose any of the options"
+    exit 1
+  else
+      # create yaml file 
+      create_yaml_file
+      # change access mode (optional)
+      if [[ "$#" -eq 1 ]]; then
+        if [[ "${1}" == 'ReadOnlyMany' || "${1}" == 'ReadWriteMany' || "${1}" == 'ReadWriteOncePod' ]]; then
+          change_access_mode $1
+        elif [[ "${1}" == 'quick' ]]; then 
+          apply_quick_mode 
+        elif [[ "${1}" == 'direct' ]]; then 
+          apply_fio_direct
+        fi 
+      fi 
+      # change storageclass name from your-storageclass to $choice 
+      set_storageclass "${choice}"
+      # actual run kdbench and show up to stdout
+      run_kdbench
+      # delete all objects for convenience purpose
+      delete_pvc_after_job_done
+  fi
+}
+
+choose_n_run_storageclasses_direct() {
+  local choice
+  choice="$1"
+      create_yaml_file
+      # change storageclass name from your-storageclass to $1 
+      set_storageclass "${choice}"
+      # actual run kdbench and show up to stdout
+      run_kdbench
+      # delete all objects for convenience purpose
+      delete_pvc_after_job_done
+}
+
+apply_quick_mode() {
+  sed -i'' -e "s|# - name: KDBENCH_QUICK|- name: KDBENCH_QUICK|g" "$YAMLFILE"
+  sed -i'' -e 's|#   value: "yes"|  value: "yes"|g' "$YAMLFILE"
+}
+
+apply_fio_direct() {
+  sed -i'' -e "s|# - name: FIO_DIRECT|- name: FIO_DIRECT|g" "$YAMLFILE"
+  sed -i'' -e 's|#   value: "1"|  value: "1"|g' "$YAMLFILE"
+}
+
+change_access_mode() {
+  sed -i'' -e "s|ReadWriteOnce|$1|g" "$YAMLFILE"
+}
+
+create_yaml_file(){
+  cp -r "$SCRACHFILE" "$YAMLFILE"
+}
+
+validate_kubectl() {
+  if [[ -z "${KUBECTL:-}" ]]; then
+    if hash kubectl 2>/dev/null; then
+      KUBECTL=kubectl
+    elif hash kubectl.exe  2>/dev/null; then
+      KUBECTL=kubectl.exe
+    else
+      echo >&2 "kubectl is not installed"
+      exit 1
+    fi
+  fi
+}
+
+run_storageclasses_interactive(){
+  if [[ -t 1 &&  -z "${KDBENCH_IGNORE_FZF:-}" && "$(type fzf &>/dev/null; echo $?)" -eq 0 ]]; then
+    if [[ "$#" -eq 0 ]]; then
+      choose_n_run_storageclasses_interactive
+    elif [[ "$#" -eq 1 ]]; then
+      choose_n_run_storageclasses_interactive "${1}"
+    else
+      :
+    fi 
+  else
+    get_storageclasses 
+  fi 
+}
+
+main() {
+  validate_kubectl
+  
+  # basic_run_interative
+  if [[ "$#" -eq 0 ]]; then
+    run_storageclasses_interactive
+  # quick_mode_on
+  elif [[ "${1}" == '-q' || "${1}" == '--quick' ]]; then
+    run_storageclasses_interactive "quick" 
+  # write_fio_direct_on
+  elif [[ "${1}" == '-d' || "${1}" == '--direct' ]]; then
+    run_storageclasses_interactive "direct"
+  # reset to init stage   
+  elif [[ "${1}" == 'reset' ]]; then
+    rm -f $YAMLFILE $YAMLFILE-e
+    $KUBECTL delete -f $SCRACHFILE 2>/dev/null || echo "Delete partly kdbench resource completely"
+    $KUBECTL get po,pv,pvc -l fio=kdbench 
+  elif [[ "${1}" == '-h' || "${1}" == '--help' ]]; then
+    usage
+  elif [[ "${1}" == '-a' ]]; then
+    if [[ "${2}" == 'RWO' || "${2}" == 'rwo'  ]]; then
+      :
+    elif [[ "${2}" == 'ROX' || "${2}" == 'rox'  ]]; then
+      run_storageclasses_interactive "ReadOnlyMany"
+    elif [[ "${2}" == 'RWX' || "${2}" == 'rwx'  ]]; then
+      run_storageclasses_interactive "ReadWriteMany"
+    elif [[ "${2}" == 'RWOP' || "${2}" == 'rwop'  ]]; then
+      run_storageclasses_interactive "ReadWriteOncePod"
+    else 
+      echo "error: check access_mode in RWO,ROX,RWX,RWOP"
+    fi
+  # run_by_storage_name_manually 
+  elif [[ "$#" -eq 1 ]]; then
+    STORAGECLASSESLIST=$(kubectl get storageclasses -o=name | cut -c 29- 2>&1)
+    if printf '%s\n' "${STORAGECLASSESLIST[@]}" | grep -q -F -x "$1" ; then
+      choose_n_run_storageclasses_direct $1
+    else
+      echo "error: check storageclass name or flag option" >&2
+      exit 1
+    fi 
+  elif [[ "$#" -gt 2 ]]; then
+    echo "error: too many arguments" >&2
+    usage
+    exit 1
+  else
+    echo "error: unrecognized flag \"${1}\" & value \"${2}"\ >&2
+    usage
+    exit 1
+  fi
+}
+
+main "$@"

@@ -1,0 +1,55 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: kdbench-pv-claim
+  labels:
+    fio: kdbench
+spec:
+  storageClassName: your-storageclass
+  # storageClassName: managed-nfs-storage 
+  # storageClassName: gp2 
+  # storageClassName: default 
+  # storageClassName: standard 
+  # storageClassName: nks-block-storage
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kdbench
+  labels:
+    fio: kdbench
+spec:
+  ttlSecondsAfterFinished: 0
+  template:
+    spec:
+      containers:
+      - name: kdbench
+        image: sysnet4admin/kdbench:latest
+        imagePullPolicy: Always
+        env:
+          - name: KDBENCH_MOUNTPOINT
+            value: /ON-your-storageclass
+          - name: STORAGECLASS
+            value: your-storageclass
+          # - name: KDBENCH_QUICK
+          #   value: "yes"
+          # - name: FIO_SIZE
+          #   value: 1G
+          # - name: FIO_OFFSET_INCREMENT
+          #   value: 256M
+          # - name: FIO_DIRECT
+          #   value: "1"
+        volumeMounts:
+        - name: kdbench-pv
+          mountPath: /ON-your-storageclass
+      restartPolicy: Never
+      volumes:
+      - name: kdbench-pv
+        persistentVolumeClaim:
+          claimName: kdbench-pv-claim
+  backoffLimit: 4

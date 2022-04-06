@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+[[ -n $DEBUG ]] && set -x
+set -eou pipefail
+IFS=$'\n\t'
+
+HOMEDIR=~/.kdbench
+
+copy_to_bin(){
+cp $HOMEDIR/kdbench /usr/local/bin/kdbench 
+}
+
+main() {
+  copy_to_bin
+  echo "successfully installed kdbench"
+}
+
+main "$@"

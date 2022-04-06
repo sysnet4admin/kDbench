@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+[[ -n $DEBUG ]] && set -x
+set -eou pipefail
+IFS=$'\n\t'
+
+HOMEDIR=~/.kdbench
+
+delete_bin(){
+sudo rm -f /usr/local/bin/kdbench 
+}
+
+delete_homedir(){
+sudo rm -rf $HOMEDIR
+}
+
+main() {
+  delete_bin && : || echo "error to delete /usr/local/bin/kdbench" 
+  delete_homedir && echo "successfully uninstalled kdbench" || echo "error to delete $HOMEDIR" 
+}
+
+main "$@"
