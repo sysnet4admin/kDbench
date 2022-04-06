@@ -112,7 +112,7 @@ $ kdbench --direct
 ```
 
 #### From fio file 
-`[TBD]`
+`[TBD]` by ConfigMap 
 
 #### Reset  
 When abnormal behavior has been occurred, please run `reset` and then rerun kdbench command.  
