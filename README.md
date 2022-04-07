@@ -30,6 +30,7 @@ Simple and automatically benchmark for your k8s storageclasses.</br>
 Highly recommanedation to install [`fzf`](https://github.com/junegunn/fzf) before you run. </br>
 [`fzf`](https://github.com/junegunn/fzf) could support **interactively** select a storageclass.
 
+```bash 
   kdbench                           : Select storageclass with fzf
   kdbench <STORAGECLASS NAME>       : Select storageclass manually (w/o fzf)
   kdbench -q, --quick               : Quick run mode (w/ fzf)
@@ -37,6 +38,7 @@ Highly recommanedation to install [`fzf`](https://github.com/junegunn/fzf) befor
   kdbench -a  <rwo,rox,rwx,rwop>    : Set access mode (w/ fzf)
   kdbench reset                     : Reset all of resources
   kdbench -h, --help                : Show this message
+```
 
 ### Interactive mode 
 ```bash
