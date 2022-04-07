@@ -123,20 +123,10 @@ $ kdbench --direct
 
 #### Set access-mode 
 The [access modes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes) changable. 
-RWO/rwo   - (default | ReadWriteOnce)
-ROX/rox   - (ReadOnlyMany)
-RWX/rwx   - (ReadWriteMany)
-RWOP/rwop - (ReadWriteOncePod)
-
-If value is true, use non-buffered I/O. This is usually O_DIRECT. Note that OpenBSD and ZFS on Solaris don’t support direct I/O. On Windows the synchronous ioengines don’t support direct I/O. Default: false.
-https://fio.readthedocs.io/en/latest/fio_doc.html
-```bash
-$ kdbench -d 
-```
-_OR_
-```bash
-$ kdbench --direct 
-```
+- RWO/rwo   - (default | ReadWriteOnce) </br>
+- ROX/rox   - (ReadOnlyMany)            </br>
+- RWX/rwx   - (ReadWriteMany)           </br>
+- RWOP/rwop - (ReadWriteOncePod)        </br>
 
 #### From fio file 
 `[TBD]` by ConfigMap 
