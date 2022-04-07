@@ -122,7 +122,7 @@ $ kdbench --direct
 ```
 
 #### Set access-mode 
-The [access modes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes) is easy to changable. 
+The [access modes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes) is changable. 
 ```
 - RWO  | rwo   (ReadWriteOnce) <<<<< **default** 
 - ROX  | rox   (ReadOnlyMany)              
