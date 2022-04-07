@@ -24,8 +24,24 @@ SELF_CMD="$0"
 SCRACHFILE=~/.kdbench/kdbench.scra
 YAMLFILE=~/.kdbench/kdbench.yaml
 
+exit_oky(){
+   exit 0
+}
 exit_err() {
    exit 1
+}
+
+usage(){
+cat <<EOF
+USAGE:
+  kdbench                           : Select storageclass with fzf 
+  kdbench <STORAGECLASS NAME>       : Select storageclass manually (w/o fzf)
+  kdbench -q, --quick               : Quick run mode (w/ fzf)
+  kdbench -d, --direct              : Direct fio write mode (w/ fzf) 
+  kdbench -a  <rwo,rox,rwx,rwop>    : Set access mode (w/ fzf)
+  kdbench reset                     : Reset all of resources 
+  kdbench -h, --help                : Show this message
+EOF
 }
 
 delete_pvc_after_job_done() {
@@ -34,7 +50,7 @@ delete_pvc_after_job_done() {
     if [[ "$(kubectl get job -l fio=kdbench 2>&1)" = *"No resources"* ]]; then
       echo -e "\nkdbench finsihed and pvc will delete"
       kubectl delete pvc -l fio=kdbench 
-      exit 0
+      exit_oky
     else
       # print dot for waiting status 
       echo -n ".";sleep 1
@@ -81,7 +97,7 @@ choose_n_run_storageclasses_interactive() {
     fzf --ansi --no-preview || true)"
   if [[ -z "${choice}" ]]; then
     echo 2>&1 "error: you did not choose any of the options"
-    exit 1
+    exit_err
   else
       # create yaml file 
       create_yaml_file
@@ -142,7 +158,7 @@ validate_kubectl() {
       KUBECTL=kubectl.exe
     else
       echo >&2 "kubectl is not installed"
-      exit 1
+      exit_err
     fi
   fi
 }
@@ -199,16 +215,16 @@ main() {
       choose_n_run_storageclasses_direct $1
     else
       echo "error: check storageclass name or flag option" >&2
-      exit 1
+      exit_err
     fi 
   elif [[ "$#" -gt 2 ]]; then
     echo "error: too many arguments" >&2
     usage
-    exit 1
+    exit_err
   else
     echo "error: unrecognized flag \"${1}\" & value \"${2}"\ >&2
     usage
-    exit 1
+    exit_err
   fi
 }
 
