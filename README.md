@@ -30,6 +30,14 @@ Simple and automatically benchmark for your k8s storageclasses.</br>
 Highly recommanedation to install [`fzf`](https://github.com/junegunn/fzf) before you run. </br>
 [`fzf`](https://github.com/junegunn/fzf) could support **interactively** select a storageclass.
 
+  kdbench                           : Select storageclass with fzf
+  kdbench <STORAGECLASS NAME>       : Select storageclass manually (w/o fzf)
+  kdbench -q, --quick               : Quick run mode (w/ fzf)
+  kdbench -d, --direct              : Direct fio write mode (w/ fzf)
+  kdbench -a  <rwo,rox,rwx,rwop>    : Set access mode (w/ fzf)
+  kdbench reset                     : Reset all of resources
+  kdbench -h, --help                : Show this message
+
 ### Interactive mode 
 ```bash
 $ kdbench 
@@ -101,6 +109,23 @@ $ kdbench --quick
 ```
 
 #### Direct fio write 
+If value is true, use non-buffered I/O. This is usually O_DIRECT. Note that OpenBSD and ZFS on Solaris don’t support direct I/O. On Windows the synchronous ioengines don’t support direct I/O. Default: false.
+https://fio.readthedocs.io/en/latest/fio_doc.html
+```bash
+$ kdbench -d 
+```
+_OR_
+```bash
+$ kdbench --direct 
+```
+
+#### Set access-mode 
+The [access modes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes) changable. 
+RWO/rwo   - (default | ReadWriteOnce)
+ROX/rox   - (ReadOnlyMany)
+RWX/rwx   - (ReadWriteMany)
+RWOP/rwop - (ReadWriteOncePod)
+
 If value is true, use non-buffered I/O. This is usually O_DIRECT. Note that OpenBSD and ZFS on Solaris don’t support direct I/O. On Windows the synchronous ioengines don’t support direct I/O. Default: false.
 https://fio.readthedocs.io/en/latest/fio_doc.html
 ```bash
