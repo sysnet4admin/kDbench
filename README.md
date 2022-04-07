@@ -123,10 +123,10 @@ $ kdbench --direct
 
 #### Set access-mode 
 The [access modes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes) changable. 
-- RWO  | rwo   - (ReadWriteOnce) **default** </br>
-- ROX  | rox   - (ReadOnlyMany)              </br>
-- RWX  | rwx   - (ReadWriteMany)             </br>
-- RWOP | rwop  - (ReadWriteOncePod)          </br>
+- RWO  | rwo   - (ReadWriteOnce) **default** 
+- ROX  | rox   - (ReadOnlyMany)              
+- RWX  | rwx   - (ReadWriteMany)             
+- RWOP | rwop  - (ReadWriteOncePod)          
 
 #### From fio file 
 `[TBD]` by ConfigMap 
