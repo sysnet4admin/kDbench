@@ -33,9 +33,11 @@ Highly recommanedation to install [`fzf`](https://github.com/junegunn/fzf) befor
 ```bash 
   kdbench                           : Select storageclass with fzf
   kdbench <STORAGECLASS NAME>       : Select storageclass manually (w/o fzf)
-  kdbench -q, --quick               : Quick run mode (w/ fzf)
+  kdbench -q, --quick               : Quick run mode        (w/ fzf)
   kdbench -d, --direct              : Direct fio write mode (w/ fzf)
-  kdbench -a  <rwo,rox,rwx,rwop>    : Set access mode (w/ fzf)
+  kdbench -a  <rwo,rox,rwx,rwop>    : Set access mode       (w/ fzf)
+  kdbench -s  <storage size>        : Set stroage size      (w/ fzf)
+  kdbench -f  <YAML FILE>           : Run as a file         (w/ fzf)
   kdbench reset                     : Reset all of resources
   kdbench -h, --help                : Show this message
 ```
@@ -128,6 +130,45 @@ The [access modes](https://kubernetes.io/docs/concepts/storage/persistent-volume
 - ROX  | rox   (ReadOnlyMany)              
 - RWX  | rwx   (ReadWriteMany)             
 - RWOP | rwop  (ReadWriteOncePod)          
+```
+
+#### Set storage size  
+Size is matter somtimes. 
+For instance GKE's [filestore](https://cloud.google.com/filestore/docs/limits) 
+```bash
+$ kdbench -s <storage size> 
+```
+#### Run as a file   
+If you want to run various options. you could change whatever you want.
+Here is `kdbench-sample.yaml` in working directory.
+Free to change but you should input storageclass manually.
+
+```bash
+$ kdbench -f <YAML FILE>
+
+```
+`kdbench-sample.yaml`
+```yaml 
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: kdbench-pv-claim
+  labels:
+    fio: kdbench
+spec:
+  storageClassName: << INPUT STORAGECLASS >> # Must change in here 
+  # storageClassName: managed-nfs-storage 
+  # storageClassName: gp2 
+  # storageClassName: default 
+  # storageClassName: standard 
+  # storageClassName: nks-block-storage
+  accessModes:
+    - ReadWriteOnce   # (optional) RWO - ReadWriteOnce, ROX - ReadOnlyMany, RWX - ReadWriteMany, RWOP - ReadWriteOncePod
+  resources:
+    requests:
+      storage: 100Gi  # (optional) filestore standard - 1000Gi, filestore premium - 2560Gi 
+---
+<snipped>
 ```
 
 #### From fio file 
