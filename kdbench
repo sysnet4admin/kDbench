@@ -42,7 +42,7 @@ USAGE:
   kdbench -d, --direct              : Direct fio write mode (w/ fzf) 
   kdbench -a  <rwo,rox,rwx,rwop>    : Set access mode       (w/ fzf)
   kdbench -s  <storage size>        : Set stroage size      (w/ fzf)
-  kdbench -f  <Yaml file>           : Run as a file         (w/ fzf)
+  kdbench -f  <YAML FILE>           : Run as a file         (w/ fzf)
   kdbench reset                     : Reset all of resources 
   kdbench -h, --help                : Show this message
 EOF
