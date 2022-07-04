@@ -23,6 +23,8 @@ IFS=$'\n\t'
 SELF_CMD="$0"
 SCRACHFILE=~/.kdbench/kdbench.scra
 YAMLFILE=~/.kdbench/kdbench.yaml
+GLOBAL_STORAGE_SIZE="100" # unit Gi 
+GLOBAL_File_NAME="kdbench.yaml"
 
 exit_oky(){
    exit 0
@@ -36,9 +38,11 @@ cat <<EOF
 USAGE:
   kdbench                           : Select storageclass with fzf 
   kdbench <STORAGECLASS NAME>       : Select storageclass manually (w/o fzf)
-  kdbench -q, --quick               : Quick run mode (w/ fzf)
+  kdbench -q, --quick               : Quick run mode        (w/ fzf)
   kdbench -d, --direct              : Direct fio write mode (w/ fzf) 
-  kdbench -a  <rwo,rox,rwx,rwop>    : Set access mode (w/ fzf)
+  kdbench -a  <rwo,rox,rwx,rwop>    : Set access mode       (w/ fzf)
+  kdbench -s  <storage size>        : Set stroage size      (w/ fzf)
+  kdbench -f  <Yaml file>           : Run as a file         (w/ fzf)
   kdbench reset                     : Reset all of resources 
   kdbench -h, --help                : Show this message
 EOF
@@ -59,28 +63,39 @@ delete_pvc_after_job_done() {
 }
 
 run_kdbench(){
-    # deploy kdbench 
+  # deploy kdbench 
+  if [[ "$#" -eq 1 ]]; then
+    :
+    if [[ "${1}" == 'file' ]]; then 
+      kubectl apply -f "${GLOBAL_File_NAME}"
+    else 
+      echo -e "error: check Yaml file name"
+      exit_err
+    fi
+  else 
+    # mostly run this command
     kubectl apply -f "$YAMLFILE"
-    # wait message for dbench 
-    echo -n "Waiting for kdbench's load (up to 5mins)..."
-    local count=0
-    while true; do
-      PODSTATUS=$(kubectl get po -l job-name=kdbench 2>&1)
-      if [[ "$PODSTATUS" = *"Creating"* ]] || [[ "$PODSTATUS" = *"Pending"* ]]; then
-        echo -n ".";sleep 1; ((count=count+1))
-        if [[ $count -gt 300 ]]; then 
-          echo -e "\n\n********* Error: Events as below *********"
-          $KUBECTL describe pvc kdbench-pv-claim | grep Message -A 50
-          exit_err
-        fi 
-      elif [[ "$PODSTATUS" = *"Running"* ]]; then
-        break 
-      else
-        echo "Pod is abnormal status"
+  fi 
+  # wait message for dbench 
+  echo -n "Waiting for kdbench's load (up to 5mins)..."
+  local count=0
+  while true; do
+    PODSTATUS=$(kubectl get po -l job-name=kdbench 2>&1)
+    if [[ "$PODSTATUS" = *"Creating"* ]] || [[ "$PODSTATUS" = *"Pending"* ]]; then
+      echo -n ".";sleep 1; ((count=count+1))
+      if [[ $count -gt 300 ]]; then 
+        echo -e "\n\n********* Error: Events as below *********"
+        $KUBECTL describe pvc kdbench-pv-claim | grep Message -A 50
+        exit_err
       fi 
-    done 
-    # kdbench result print out on stdout 
-    kubectl logs -f job/kdbench
+    elif [[ "$PODSTATUS" = *"Running"* ]]; then
+      break 
+    else
+      echo "Pod is abnormal status"
+    fi 
+  done 
+  # kdbench result print out on stdout 
+  kubectl logs -f job/kdbench
 }
 
 get_storageclasses() {
@@ -101,7 +116,7 @@ choose_n_run_storageclasses_interactive() {
   else
       # create yaml file 
       create_yaml_file
-      # change access mode (optional)
+      # change mode (optional)
       if [[ "$#" -eq 1 ]]; then
         if [[ "${1}" == 'ReadOnlyMany' || "${1}" == 'ReadWriteMany' || "${1}" == 'ReadWriteOncePod' ]]; then
           change_access_mode $1
@@ -109,27 +124,38 @@ choose_n_run_storageclasses_interactive() {
           apply_quick_mode 
         elif [[ "${1}" == 'direct' ]]; then 
           apply_fio_direct
+        elif [[ "${1}" == 'storage' ]]; then 
+          change_storage_size "${GLOBAL_STORAGE_SIZE}"
         fi 
       fi 
       # change storageclass name from your-storageclass to $choice 
       set_storageclass "${choice}"
       # actual run kdbench and show up to stdout
-      run_kdbench
+      run_kdbench 
       # delete all objects for convenience purpose
       delete_pvc_after_job_done
   fi
 }
 
 choose_n_run_storageclasses_direct() {
+
+# file mode (optional)
+  if [[ "${1}" == 'file' ]]; then 
+    run_kdbench $1 
+    delete_pvc_after_job_done
+    exit 0
+  fi 
+  # normal direct mode 
   local choice
   choice="$1"
-      create_yaml_file
-      # change storageclass name from your-storageclass to $1 
-      set_storageclass "${choice}"
-      # actual run kdbench and show up to stdout
-      run_kdbench
-      # delete all objects for convenience purpose
-      delete_pvc_after_job_done
+
+    create_yaml_file
+    # change storageclass name from your-storageclass to $1 
+    set_storageclass "${choice}"
+    # actual run kdbench and show up to stdout
+    run_kdbench
+    # delete all objects for convenience purpose
+    delete_pvc_after_job_done
 }
 
 apply_quick_mode() {
@@ -144,6 +170,10 @@ apply_fio_direct() {
 
 change_access_mode() {
   sed -i'' -e "s|ReadWriteOnce|$1|g" "$YAMLFILE"
+}
+
+change_storage_size() {
+  sed -i'' -e "s|storage: 100|storage: $1|g" "$YAMLFILE"
 }
 
 create_yaml_file(){
@@ -208,6 +238,24 @@ main() {
     else 
       echo "error: check access_mode in RWO,ROX,RWX,RWOP"
     fi
+  # storage size   
+  elif [[ "${1}" == '-s' ]]; then
+    if [[ "${2}" =~ ^-?[0-9]+$ ]]; then
+      GLOBAL_STORAGE_SIZE="${2}"
+      run_storageclasses_interactive "storage" 
+    else
+      echo "error: check storage class size number" >&2
+      exit_err
+    fi
+  # From Yaml file 
+  elif [[ "${1}" == '-f' ]]; then
+    if [[ "$#" -eq 2 ]]; then
+      GLOBAL_File_NAME="${2}"
+      choose_n_run_storageclasses_direct "file" 
+    else
+      echo "error: check Yaml file name" >&2
+      exit_err
+    fi 
   # run_by_storage_name_manually 
   elif [[ "$#" -eq 1 ]]; then
     STORAGECLASSESLIST=$(kubectl get storageclasses -o=name | cut -c 29- 2>&1)
